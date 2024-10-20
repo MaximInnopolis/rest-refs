@@ -10,7 +10,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"rest-refs/internal/app/models"
 	"rest-refs/internal/app/repository"
-	"rest-refs/internal/app/repository/postgresql"
 )
 
 var ErrUserAlreadyExists = errors.New("пользователь уже существует")
@@ -39,11 +38,6 @@ func (as *AuthService) CreateUser(user models.User) error {
 		return ErrUserAlreadyExists
 	}
 
-	if !errors.Is(err, postgresql.ErrNotFound) {
-		as.logger.Errorf("CreateUser[service]: Ошибка при получении пользователя из базы: %s", err)
-		return err
-	}
-
 	// Hash user's password before saving
 	user.Password, err = generatePasswordHash(user.Password)
 	if err != nil {
@@ -60,10 +54,6 @@ func (as *AuthService) CreateUser(user models.User) error {
 
 	as.logger.Infof("CreateUser[service]: Пользователь успешно создан: %+v", user)
 	return nil
-}
-
-func (as *AuthService) FindUserByEmail(email string) (models.User, error) {
-
 }
 
 // GenerateToken generates JWT for authenticated user

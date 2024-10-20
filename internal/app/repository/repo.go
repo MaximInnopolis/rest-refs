@@ -17,11 +17,14 @@ type UserRepo interface {
 type ReferralRepo interface {
 	Create(referralCode models.ReferralCode) (models.ReferralCode, error)
 	Delete(referrerID int) error
-	GetByEmail(email string) (models.ReferralCode, error)
-	Get(code string) (models.ReferralCode, error)
+	GetActiveReferralCodeByReferrerID(referrerID int) (models.ReferralCode, error)
+	GetReferrerIDByEmail(email string) (int, error)
+	GetReferralsByReferrerID(id int) ([]models.Referral, error)
+
+	//GetByEmail(email string) (models.ReferralCode, error)
+	//Get(code string) (models.ReferralCode, error)
+
 	Register(referralCodeID, referredUserID int) error
-	GetByReferrerID(referrerID int) ([]models.ReferralInfoResponse, error)
-	GetActiveReferralCodeByReferrerID(referrerID int) (*models.ReferralCode, error)
 }
 
 // Repository combines UserRepo and ReferralRepo interfaces into single struct

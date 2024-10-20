@@ -11,15 +11,16 @@ type Authorization interface {
 	CreateUser(user models.User) error
 	GenerateToken(user models.User) (string, error)
 	IsTokenValid(tokenString string) (bool, jwt.MapClaims, error)
-	FindUserByEmail(email string) (models.User, error)
 }
 
 type Refferal interface {
 	CreateReferralCode(referralCode models.ReferralCode) (models.ReferralCode, error)
 	DeleteReferralCode(referrerID int) error
-	GetReferralCodeByEmail(email string) (models.ReferralCode, error)
-	RegisterWithReferralCode(referralCode string, user models.User) error
+	GetReferralCodeByReferrerEmail(email string) (models.ReferralCode, error)
+
 	GetReferralsByReferrerID(referrerID int) ([]models.ReferralInfoResponse, error)
+
+	RegisterWithReferralCode(referralCode string, user models.User) error
 }
 
 type Service struct {

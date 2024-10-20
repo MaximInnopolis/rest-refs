@@ -11,7 +11,7 @@ import (
 	"rest-refs/internal/app/repository/database"
 )
 
-var ErrNotFound = errors.New("user not found")
+var ErrUserNotFound = errors.New("пользователь не найден")
 
 // UserPostgres implements the UserRepo interface for PostgreSQL database operations related to users
 type UserPostgres struct {
@@ -59,7 +59,7 @@ func (up *UserPostgres) Get(user models.User) (models.User, error) {
 		Scan(&dbUser.ID, &dbUser.Email, &dbUser.Password, &dbUser.CreatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return models.User{}, ErrNotFound
+			return models.User{}, ErrUserNotFound
 		}
 		return models.User{}, err
 	}

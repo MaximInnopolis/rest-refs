@@ -6,8 +6,8 @@ import (
 
 type Referral struct {
 	ID             int       `json:"id"`
-	ReferrerID     int       `json:"referrer_id"`
+	Email          string    `json:"email"`
 	ReferralCodeID int       `json:"referral_code_id"`
-	ReferredUserID int       `json:"referred_user_id"`
+	ReferrerID     int       `json:"referrer_id"`
 	CreatedAt      time.Time `json:"created_at"`
 }

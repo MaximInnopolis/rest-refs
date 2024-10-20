@@ -29,7 +29,7 @@ func (h *Handler) RegisterRoutes(r *mux.Router) {
 
 	authRouter.HandleFunc("/register", h.RegisterUserHandler).Methods("POST")
 	authRouter.HandleFunc("/login", h.LoginUserHandler).Methods("POST")
-	authRouter.HandleFunc("/register/referral", h.RegisterWithReferralHandler).Methods("POST")
+	authRouter.HandleFunc("/register/referral", h.RegisterWithReferralHandler).Methods("POST") //
 
 	referralRouter := r.PathPrefix("/referral").Subrouter()
 
@@ -40,7 +40,7 @@ func (h *Handler) RegisterRoutes(r *mux.Router) {
 	referralRouter.Handle("", h.RequireValidTokenMiddleware(deleteReferralRouter)).Methods("DELETE")
 
 	referralRouter.HandleFunc("/{email}", h.GetReferralCodeByEmailHandler).Methods("GET")
-	referralRouter.HandleFunc("/{referrer_id}", h.GetReferralsByReferrerIDHandler).Methods("GET")
+	referralRouter.HandleFunc("/{referrer_id}", h.GetReferralsByReferrerIDHandler).Methods("GET") //
 
 	// Swagger documentation endpoint
 	r.PathPrefix("/docs/swagger/").Handler(httpSwagger.WrapHandler)
