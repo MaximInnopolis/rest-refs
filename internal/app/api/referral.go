@@ -41,6 +41,7 @@ func (r *ReferralService) GetReferralsByReferrerID(referrerID int) ([]models.Ref
 	var response []models.ReferralInfoResponse
 	for _, referral := range referrals {
 		response = append(response, models.ReferralInfoResponse{
+			ReferralID: referral.ID,
 			ReferrerID: referral.ReferrerID,
 			Email:      referral.Email,
 			CreatedAt:  referral.CreatedAt,
