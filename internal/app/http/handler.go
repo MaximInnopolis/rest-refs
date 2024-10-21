@@ -29,18 +29,20 @@ func (h *Handler) RegisterRoutes(r *mux.Router) {
 
 	authRouter.HandleFunc("/register", h.RegisterUserHandler).Methods("POST")
 	authRouter.HandleFunc("/login", h.LoginUserHandler).Methods("POST")
-	authRouter.HandleFunc("/register/referral", h.RegisterWithReferralHandler).Methods("POST") //
+	//authRouter.HandleFunc("/register/referral", h.RegisterWithReferralHandler).Methods("POST")
+
+	referralCodeRouter := r.PathPrefix("/referral_code").Subrouter()
+
+	createReferralCodeRouter := http.HandlerFunc(h.CreateReferralCodeHandler)
+	referralCodeRouter.Handle("", h.RequireValidTokenMiddleware(createReferralCodeRouter)).Methods("POST")
+
+	deleteReferralCodeRouter := http.HandlerFunc(h.DeleteReferralCodeHandler)
+	referralCodeRouter.Handle("", h.RequireValidTokenMiddleware(deleteReferralCodeRouter)).Methods("DELETE")
+
+	referralCodeRouter.HandleFunc("/email/{email}", h.GetReferralCodeByEmailHandler).Methods("GET")
 
 	referralRouter := r.PathPrefix("/referral").Subrouter()
-
-	createReferralRouter := http.HandlerFunc(h.CreateReferralCodeHandler)
-	referralRouter.Handle("", h.RequireValidTokenMiddleware(createReferralRouter)).Methods("POST")
-
-	deleteReferralRouter := http.HandlerFunc(h.DeleteReferralCodeHandler)
-	referralRouter.Handle("", h.RequireValidTokenMiddleware(deleteReferralRouter)).Methods("DELETE")
-
-	referralRouter.HandleFunc("/{email}", h.GetReferralCodeByEmailHandler).Methods("GET")
-	referralRouter.HandleFunc("/{referrer_id}", h.GetReferralsByReferrerIDHandler).Methods("GET") //
+	referralRouter.HandleFunc("/id/{referrer_id}", h.GetReferralsByReferrerIDHandler).Methods("GET")
 
 	// Swagger documentation endpoint
 	r.PathPrefix("/docs/swagger/").Handler(httpSwagger.WrapHandler)

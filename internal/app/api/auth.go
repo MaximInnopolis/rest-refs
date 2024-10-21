@@ -29,9 +29,9 @@ func NewAuthService(repo repository.UserRepo, logger *logrus.Logger) *AuthServic
 }
 
 func (as *AuthService) CreateUser(user models.User) error {
-	as.logger.Infof("CreateUser[service]: Создание пользователя: %+v", user)
+	as.logger.Debugf("CreateUser[service]: Создание пользователя с email: %s", user.Email)
 
-	_, err := as.repo.Get(user)
+	_, err := as.repo.GetByEmail(user.Email)
 	if err == nil {
 		as.logger.Errorf("CreateUser[service]: Создание пользователя не удалось: " +
 			"Пользователь с таким email уже существует")
@@ -52,19 +52,26 @@ func (as *AuthService) CreateUser(user models.User) error {
 		return err
 	}
 
-	as.logger.Infof("CreateUser[service]: Пользователь успешно создан: %+v", user)
+	as.logger.Infof("CreateUser[service]: Пользователь с email %s успешно создан", user.Email)
 	return nil
 }
 
 // GenerateToken generates JWT for authenticated user
 // It retrieves user from repository and creates signed JWT token
 func (as *AuthService) GenerateToken(user models.User) (string, error) {
-	as.logger.Infof("GenerateToken[service]: Создание токена для пользователя: %+v", user)
+	as.logger.Debugf("GenerateToken[service]: Создание токена для пользователя: %s", user.Email)
 
-	dbUser, err := as.repo.Get(user)
+	dbUser, err := as.repo.GetByEmail(user.Email)
 	if err != nil {
-		as.logger.Errorf("GenerateToken[service]: Ошибка при получении пользователя для генерации токена: %s", err)
+		as.logger.Errorf("GenerateToken[service]: Ошибка при получении пользователя: %s для генерации токена: %s", user.Email, err)
 		return "", err
+	}
+
+	// Compare provided password with hashed password stored in database
+	err = bcrypt.CompareHashAndPassword([]byte(dbUser.Password), []byte(user.Password))
+	if err != nil {
+		as.logger.Errorf("GenerateToken[service]: Ошибка при сравнении паролей пользователя: %s: ,%s", user.Email, err)
+		return "", errors.New("invalid password")
 	}
 
 	// Generate JWT token
@@ -74,14 +81,14 @@ func (as *AuthService) GenerateToken(user models.User) (string, error) {
 		return "", err
 	}
 
-	as.logger.Infof("GenerateToken[service]: JWT успешно сгенерирован для пользователя: %+v", dbUser)
+	as.logger.Infof("GenerateToken[service]: JWT успешно сгенерирован для пользователя: %s", dbUser.Email)
 	return token, nil
 }
 
 // IsTokenValid validates given JWT
 // It checks token's signature, claims, and expiration time
 func (as *AuthService) IsTokenValid(tokenString string) (bool, jwt.MapClaims, error) {
-	as.logger.Infof("IsTokenValid[service]: Проверка валидности токена")
+	as.logger.Debugf("IsTokenValid[service]: Проверка валидности токена")
 
 	// Check token validity
 	validToken, claims, err := as.checkToken(tokenString)
@@ -97,7 +104,7 @@ func (as *AuthService) IsTokenValid(tokenString string) (bool, jwt.MapClaims, er
 // checkToken parses and validates JWT
 // It verifies token's signature and checks expiration claim
 func (as *AuthService) checkToken(tokenString string) (bool, jwt.MapClaims, error) {
-	as.logger.Infof("checkToken[service]: Проверка токена")
+	as.logger.Debugf("checkToken[service]: Проверка токена")
 
 	// Parse token
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
@@ -130,12 +137,13 @@ func (as *AuthService) checkToken(tokenString string) (bool, jwt.MapClaims, erro
 		return false, nil, nil
 	}
 
+	as.logger.Infof("checkToken[service]: Токен успешно проверен")
 	return true, claims, nil
 }
 
 // generateJWT generates JWT for provided user with 24-hour expiration time
 func (as *AuthService) generateJWT(user models.User) (string, error) {
-	as.logger.Infof("generateJWT([service]: Генерация токена для пользователя %+v", user)
+	as.logger.Debugf("generateJWT([service]: Генерация токена для пользователя: %s", user.Email)
 
 	token := jwt.New(jwt.SigningMethodHS256)
 
@@ -153,6 +161,8 @@ func (as *AuthService) generateJWT(user models.User) (string, error) {
 		as.logger.Printf("generateJWT[service]: Ошибка при подписании токена: %s", err)
 		return "", err
 	}
+
+	as.logger.Debugf("generateJWT([service]: Токена успешно сгенерирован для пользователя: %s", user.Email)
 	return tokenString, nil
 }
 

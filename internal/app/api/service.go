@@ -13,19 +13,21 @@ type Authorization interface {
 	IsTokenValid(tokenString string) (bool, jwt.MapClaims, error)
 }
 
-type Refferal interface {
+type ReferralCode interface {
 	CreateReferralCode(referralCode models.ReferralCode) (models.ReferralCode, error)
 	DeleteReferralCode(referrerID int) error
 	GetReferralCodeByReferrerEmail(email string) (models.ReferralCode, error)
+}
 
+type Referral interface {
 	GetReferralsByReferrerID(referrerID int) ([]models.ReferralInfoResponse, error)
-
-	RegisterWithReferralCode(referralCode string, user models.User) error
+	//RegisterWithReferralCode(referralCode string, user models.User) error
 }
 
 type Service struct {
 	Authorization
-	Refferal
+	Referral
+	ReferralCode
 }
 
 // New returns new instance of Service, initializing dependencies
@@ -33,6 +35,7 @@ type Service struct {
 func New(repo *repository.Repository, logger *logrus.Logger) *Service {
 	return &Service{
 		Authorization: NewAuthService(repo.UserRepo, logger),
-		Refferal:      NewReferralService(repo.ReferralRepo, logger),
+		ReferralCode:  NewReferralCodeService(repo.ReferralCodeRepo, logger),
+		Referral:      NewReferralService(repo.ReferralRepo, logger),
 	}
 }
