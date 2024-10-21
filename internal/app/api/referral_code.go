@@ -14,15 +14,17 @@ const referralCodeLength = 8
 
 // ReferralCodeService represents service for handling referral codes
 type ReferralCodeService struct {
-	repo   repository.ReferralCodeRepo
-	logger *logrus.Logger
+	repo        repository.ReferralCodeRepo
+	logger      *logrus.Logger
+	authService *AuthService
 }
 
 // NewReferralCodeService creates new instance of ReferralCodeService with repository, authService
-func NewReferralCodeService(repo repository.ReferralCodeRepo, logger *logrus.Logger) *ReferralCodeService {
+func NewReferralCodeService(repo repository.ReferralCodeRepo, authService *AuthService, logger *logrus.Logger) *ReferralCodeService {
 	return &ReferralCodeService{
-		repo:   repo,
-		logger: logger,
+		repo:        repo,
+		authService: authService,
+		logger:      logger,
 	}
 }
 
@@ -84,7 +86,7 @@ func (r *ReferralCodeService) DeleteReferralCode(referrerID int) error {
 func (r *ReferralCodeService) GetReferralCodeByReferrerEmail(email string) (models.ReferralCode, error) {
 	r.logger.Debugf("GetReferralCodeByReferrerEmail[service]: Получение реферального кода для email: %s", email)
 
-	user, err := r.repo.GetByEmail(email)
+	user, err := r.authService.GetUserByEmail(email)
 	if err != nil {
 		r.logger.Errorf("GetReferralCodeByReferrerEmail[service]: Ошибка при получении id пользователя"+
 			" по email %s: %s", email, err)
@@ -100,4 +102,14 @@ func (r *ReferralCodeService) GetReferralCodeByReferrerEmail(email string) (mode
 
 	r.logger.Infof("GetReferralCodeByReferrerEmail[service]: Реферальный код успешно получен для email: %s", email)
 	return code, nil
+}
+
+func (r *ReferralCodeService) GetIDByReferralCode(code string) (int, error) {
+	r.logger.Debugf("GetIDByReferralCode[service]: Получение id реферального кода: %s", code)
+	return r.repo.GetIDByReferralCode(code)
+}
+
+func (r *ReferralCodeService) GetReferrerIDByReferralCode(code string) (int, error) {
+	r.logger.Debugf("GetReferrerIDByReferralCode[service]: Получение id реферера по реферальному коду: %s", code)
+	return r.repo.GetReferrerIDByReferralCode(code)
 }

@@ -29,7 +29,7 @@ func (h *Handler) RegisterRoutes(r *mux.Router) {
 
 	authRouter.HandleFunc("/register", h.RegisterUserHandler).Methods("POST")
 	authRouter.HandleFunc("/login", h.LoginUserHandler).Methods("POST")
-	//authRouter.HandleFunc("/register/referral", h.RegisterWithReferralHandler).Methods("POST")
+	authRouter.HandleFunc("/register/referral", h.RegisterWithReferralHandler).Methods("POST")
 
 	referralCodeRouter := r.PathPrefix("/referral_code").Subrouter()
 

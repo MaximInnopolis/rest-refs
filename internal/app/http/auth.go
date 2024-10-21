@@ -7,6 +7,7 @@ import (
 
 	"rest-refs/internal/app/api"
 	"rest-refs/internal/app/models"
+	"rest-refs/internal/app/repository/postgresql"
 )
 
 func (h *Handler) RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
@@ -26,7 +27,7 @@ func (h *Handler) RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Attempt to create user using service
-	err := h.service.Authorization.CreateUser(user)
+	err := h.service.Authorization.RegisterUser(user)
 	if err != nil {
 		if errors.Is(err, api.ErrUserAlreadyExists) {
 			http.Error(w, "Такой пользователь уже существует", http.StatusConflict)
@@ -76,41 +77,51 @@ func (h *Handler) LoginUserHandler(w http.ResponseWriter, r *http.Request) {
 	h.logger.Debugf("LoginUserHandler[http]: Логин пользователя прошел успешно")
 }
 
-//func (h *Handler) RegisterWithReferralHandler(w http.ResponseWriter, r *http.Request) {
-//	h.logger.Debugf("RegisterWithReferralHandler[http]: Регистрация реферала")
-//
-//	var input models.RegisterRequest
-//
-//	// Decode request body into input struct
-//	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-//		http.Error(w, "Неправильный формат данных", http.StatusBadRequest)
-//		return
-//	}
-//
-//	if input.ReferralCode == "" {
-//		http.Error(w, "Реферальный код не может быть пустым", http.StatusBadRequest)
-//		return
-//	}
-//
-//	user := models.User{
-//		Email:    input.Email,
-//		Password: input.Password,
-//	}
-//
-//	// Attempt to register referral using service
-//	err := h.service.Referral.RegisterWithReferralCode(input.ReferralCode, user)
-//	if err != nil {
-//		if errors.Is(err, api.ErrUserAlreadyExists) {
-//			http.Error(w, "Такой пользователь уже существует", http.StatusConflict)
-//			return
-//		}
-//
-//		http.Error(w, "Проблема на сервере", http.StatusInternalServerError)
-//		return
-//	}
-//
-//	// Respond with created user
-//	w.Header().Set("Content-Type", "application/json")
-//	w.WriteHeader(http.StatusCreated)
-//	h.logger.Infof("RegisterUserHandler[http]: Регистрация реферала прошла успешно")
-//}
+func (h *Handler) RegisterWithReferralHandler(w http.ResponseWriter, r *http.Request) {
+	h.logger.Debugf("RegisterWithReferralHandler[http]: Регистрация реферала")
+
+	var input models.RegisterRequest
+
+	// Decode request body into input struct
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		http.Error(w, "Неправильный формат данных", http.StatusBadRequest)
+		return
+	}
+
+	if input.ReferralCode == "" {
+		http.Error(w, "Реферальный код не может быть пустым", http.StatusBadRequest)
+		return
+	}
+
+	user := models.User{
+		Email:    input.Email,
+		Password: input.Password,
+	}
+
+	// Attempt to register referral using service
+	err := h.service.Referral.RegisterWithReferralCode(input.ReferralCode, user)
+	if err != nil {
+		if errors.Is(err, postgresql.ErrReferralCodeNotFound) {
+			http.Error(w, "Введенный реферальный код не существует", http.StatusNotFound)
+			return
+		}
+
+		if errors.Is(err, api.ErrReferralCodeNotActive) {
+			http.Error(w, "Введенный реферальный код неактивен", http.StatusBadRequest)
+			return
+		}
+
+		if errors.Is(err, api.ErrUserAlreadyExists) {
+			http.Error(w, "Пользователь с указанными данными уже зарегистрирован", http.StatusConflict)
+			return
+		}
+
+		http.Error(w, "Проблема на сервере", http.StatusInternalServerError)
+		return
+	}
+
+	// Respond with created user
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	h.logger.Infof("RegisterUserHandler[http]: Регистрация реферала прошла успешно")
+}

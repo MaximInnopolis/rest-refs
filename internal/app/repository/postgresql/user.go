@@ -12,14 +12,15 @@ import (
 
 var ErrUserNotFound = errors.New("пользователь не найден")
 
-type UserGetterPostgres struct {
+// UserPostgres implements the UserRepo interface for PostgreSQL database operations related to users
+type UserPostgres struct {
 	db     database.Database
 	logger *logrus.Logger
 }
 
-// NewUserGetterPostgres creates new UserGetterPostgres instance with provided database connection and logger
-func NewUserGetterPostgres(db database.Database, logger *logrus.Logger) *UserGetterPostgres {
-	return &UserGetterPostgres{
+// NewUserPostgres creates new UserPostgres instance with provided database connection and logger
+func NewUserPostgres(db database.Database, logger *logrus.Logger) *UserPostgres {
+	return &UserPostgres{
 		db:     db,
 		logger: logger,
 	}
@@ -27,7 +28,7 @@ func NewUserGetterPostgres(db database.Database, logger *logrus.Logger) *UserGet
 
 // GetByEmail retrieves user from the users table by email and verifies provided password
 // Returns user and error if user is not found
-func (up *UserGetterPostgres) GetByEmail(email string) (models.User, error) {
+func (up *UserPostgres) GetByEmail(email string) (models.User, error) {
 	up.logger.Debugf("GetByEmail[repo]: Получение пользователя по email: %s", email)
 
 	query := `SELECT id, email, password, created_at FROM users WHERE email = $1`
@@ -48,35 +49,22 @@ func (up *UserGetterPostgres) GetByEmail(email string) (models.User, error) {
 	return dbUser, nil
 }
 
-// UserPostgres implements the UserRepo interface for PostgreSQL database operations related to users
-type UserPostgres struct {
-	getterPostgres *UserGetterPostgres
-}
-
-func (up *UserPostgres) GetByEmail(email string) (models.User, error) {
-	return up.getterPostgres.GetByEmail(email)
-}
-
-func NewUserPostgres(getterPostgres *UserGetterPostgres) *UserPostgres {
-	return &UserPostgres{getterPostgres: getterPostgres}
-}
-
 // Create inserts new user into the users table and returns error if operation fails
 func (up *UserPostgres) Create(user models.User) error {
-	up.getterPostgres.logger.Infof("Create[repo]: Создание нового пользователя: %s", user.Email)
+	up.logger.Debugf("Create[repo]: Создание нового пользователя: %s", user.Email)
 
 	query := `INSERT INTO users (email, password, created_at) 
 	          VALUES ($1, $2, NOW()) RETURNING id, created_at`
 	ctx := context.Background()
 
 	// Execute query and scan returned ID, created_at, and updated_at into user object
-	err := up.getterPostgres.db.GetPool().QueryRow(ctx, query, user.Email, user.Password).
+	err := up.db.GetPool().QueryRow(ctx, query, user.Email, user.Password).
 		Scan(&user.ID, &user.CreatedAt)
 	if err != nil {
-		up.getterPostgres.logger.Errorf("Create[repo]: Ошибка создания пользователя: %s, ошибка: %s", user.Email, err)
+		up.logger.Errorf("Create[repo]: Ошибка создания пользователя: %s, ошибка: %s", user.Email, err)
 		return err
 	}
 
-	up.getterPostgres.logger.Infof("Create[repo]: Новый пользователь: %s успешно создан", user.Email)
+	up.logger.Infof("Create[repo]: Новый пользователь: %s успешно создан", user.Email)
 	return nil
 }

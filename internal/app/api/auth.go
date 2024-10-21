@@ -28,12 +28,17 @@ func NewAuthService(repo repository.UserRepo, logger *logrus.Logger) *AuthServic
 	}
 }
 
-func (as *AuthService) CreateUser(user models.User) error {
-	as.logger.Debugf("CreateUser[service]: Создание пользователя с email: %s", user.Email)
+func (as *AuthService) GetUserByEmail(email string) (models.User, error) {
+	as.logger.Debugf("GetByEmail[service]: Получение пользователя по email: %s", email)
+	return as.repo.GetByEmail(email)
+}
 
-	_, err := as.repo.GetByEmail(user.Email)
+func (as *AuthService) RegisterUser(user models.User) error {
+	as.logger.Debugf("RegisterUser[service]: Регистрация пользователя с email: %s", user.Email)
+
+	_, err := as.GetUserByEmail(user.Email)
 	if err == nil {
-		as.logger.Errorf("CreateUser[service]: Создание пользователя не удалось: " +
+		as.logger.Errorf("RegisterUser[service]: Регистрация пользователя не удалось: " +
 			"Пользователь с таким email уже существует")
 		return ErrUserAlreadyExists
 	}
@@ -41,18 +46,18 @@ func (as *AuthService) CreateUser(user models.User) error {
 	// Hash user's password before saving
 	user.Password, err = generatePasswordHash(user.Password)
 	if err != nil {
-		as.logger.Errorf("CreateUser[service]: Ошибка при хэшировании пароля: %s", err)
+		as.logger.Errorf("RegisterUser[service]: Ошибка при хэшировании пароля: %s", err)
 		return err
 	}
 
 	// Save new user in repository
 	err = as.repo.Create(user)
 	if err != nil {
-		as.logger.Errorf("CreateUser[service]: Ошибка при создании пользователя в базе: %s", err)
+		as.logger.Errorf("RegisterUser[service]: Ошибка при создании пользователя в базе: %s", err)
 		return err
 	}
 
-	as.logger.Infof("CreateUser[service]: Пользователь с email %s успешно создан", user.Email)
+	as.logger.Infof("RegisterUser[service]: Пользователь с email: %s успешно зарегистрирован", user.Email)
 	return nil
 }
 
@@ -162,7 +167,7 @@ func (as *AuthService) generateJWT(user models.User) (string, error) {
 		return "", err
 	}
 
-	as.logger.Debugf("generateJWT([service]: Токена успешно сгенерирован для пользователя: %s", user.Email)
+	as.logger.Debugf("generateJWT([service]: Токен успешно сгенерирован для пользователя: %s", user.Email)
 	return tokenString, nil
 }
 
