@@ -106,7 +106,7 @@ func (h *Handler) RegisterWithReferralHandler(w http.ResponseWriter, r *http.Req
 			return
 		}
 
-		if errors.Is(err, api.ErrReferralCodeNotActive) {
+		if errors.Is(err, postgresql.ErrReferralCodeNotActive) {
 			http.Error(w, "Введенный реферальный код неактивен", http.StatusBadRequest)
 			return
 		}

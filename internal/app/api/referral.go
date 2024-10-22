@@ -3,15 +3,12 @@ package api
 import (
 	"crypto/rand"
 	"encoding/base64"
-	"errors"
 	"strings"
 
 	"github.com/sirupsen/logrus"
 	"rest-refs/internal/app/models"
 	"rest-refs/internal/app/repository"
 )
-
-var ErrReferralCodeNotActive = errors.New("реферальный код не существует")
 
 // ReferralService represents service for handling referrals
 type ReferralService struct {
@@ -60,9 +57,6 @@ func (r *ReferralService) RegisterWithReferralCode(referralCode string, user mod
 	codeID, err := r.referralCodeService.GetIDByReferralCode(referralCode)
 	if err != nil {
 		return err
-	}
-	if codeID == 0 {
-		return ErrReferralCodeNotActive
 	}
 
 	// Attempt to create user using service

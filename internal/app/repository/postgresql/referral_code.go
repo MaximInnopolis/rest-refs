@@ -13,6 +13,7 @@ import (
 )
 
 var ErrReferralCodeNotFound = errors.New("реферальный код не найден")
+var ErrReferralCodeNotActive = errors.New("реферальный код неактивен")
 
 type ReferralCodePostgres struct {
 	db     database.Database
@@ -35,19 +36,57 @@ func (r *ReferralCodePostgres) Create(referralCode models.ReferralCode) (models.
               RETURNING id, created_at, updated_at;`
 	ctx := context.Background()
 
-	err := r.db.GetPool().QueryRow(ctx, query, referralCode.Code, referralCode.Expiration, referralCode.ReferrerID).Scan(
-		&referralCode.ID,
-		&referralCode.CreatedAt,
-		&referralCode.UpdatedAt,
-	)
-	if err != nil {
-		r.logger.Errorf("Create[repo]: Ошибка создания реферального кода: %+v в базе: %s", referralCode, err)
+	// Create context with timeout to cancel query execution if it takes too long
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel() // Cancel context after function ends
+
+	// Use a channel to get referral code from goroutine
+	codeChan := make(chan models.ReferralCode)
+
+	// Use a channel to get error from goroutine
+	errChan := make(chan error)
+
+	go func() {
+		// Begin transaction
+		tx, err := r.db.GetPool().BeginTx(ctx, pgx.TxOptions{})
+		if err != nil {
+			r.logger.Errorf("Create[repo]: Ошибка начала транзакции: %s", err)
+			errChan <- err
+			return
+		}
+		defer tx.Rollback(ctx) // Rollback transaction if function returns error
+
+		// Execute query and scan returned referral code into referral code object
+		err = tx.QueryRow(ctx, query, referralCode.Code, referralCode.Expiration, referralCode.ReferrerID).
+			Scan(&referralCode.ID, &referralCode.CreatedAt, &referralCode.UpdatedAt)
+		if err != nil {
+			r.logger.Errorf("Create[repo]: Ошибка создания реферального кода: %+v в базе: %s", referralCode, err)
+			errChan <- err
+			return
+		}
+
+		// Commit transaction
+		if err = tx.Commit(ctx); err != nil {
+			r.logger.Errorf("Create[repo]: Ошибка при коммите транзакции: %s", err)
+			errChan <- err
+			return
+		}
+
+		codeChan <- referralCode
+	}()
+
+	select {
+	case code := <-codeChan:
+		r.logger.Infof("Create[repo]: Новый реферальный код для пользователя"+
+			" c id: %d успешно создан", referralCode.ReferrerID)
+		return code, nil
+	case err := <-errChan:
 		return models.ReferralCode{}, err
+	case <-ctx.Done():
+		r.logger.Errorf("Create[repo]: Время ожидания превышено")
+		return models.ReferralCode{}, ctx.Err()
 	}
 
-	r.logger.Infof("Create[repo]: Новый реферальный код для пользователя"+
-		" c id: %d успешно создан", referralCode.ReferrerID)
-	return referralCode, nil
 }
 
 // DeleteActiveReferralCodeByID removes referral code from database by ID
@@ -58,23 +97,55 @@ func (r *ReferralCodePostgres) DeleteActiveReferralCodeByID(id int) error {
 	query := `DELETE FROM referral_codes WHERE id = $1`
 	ctx := context.Background()
 
-	// Execute delete query and check how many rows were affected
-	result, err := r.db.GetPool().Exec(ctx, query, id)
-	if err != nil {
-		r.logger.Errorf("DeleteActiveReferralCodeByID[repo]: Ошибка удаления реферального кода"+
-			" с id: %d: %s", id, err)
+	// Create context with timeout to cancel query execution if it takes too long
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel() // Cancel context after function ends
+
+	// Use a channel to get error from goroutine
+	errChan := make(chan error)
+
+	go func() {
+		// Begin transaction
+		tx, err := r.db.GetPool().BeginTx(ctx, pgx.TxOptions{})
+		if err != nil {
+			r.logger.Errorf("DeleteActiveReferralCodeByID[repo]: Ошибка начала транзакции: %s", err)
+			errChan <- err
+			return
+		}
+		defer tx.Rollback(ctx) // Rollback transaction if function returns error
+
+		// Execute delete query and check how many rows were affected
+		result, err := tx.Exec(ctx, query, id)
+		if err != nil {
+			r.logger.Errorf("DeleteActiveReferralCodeByID[repo]: Ошибка удаления реферального кода с id: %d: %s", id, err)
+			errChan <- err
+			return
+		}
+
+		if result.RowsAffected() == 0 {
+			r.logger.Warnf("DeleteActiveReferralCodeByID[repo]: Реферальный код с id: %d не найден для удаления", id)
+			errChan <- ErrReferralCodeNotFound
+			return
+		}
+
+		// Commit transaction
+		if err = tx.Commit(ctx); err != nil {
+			r.logger.Errorf("DeleteActiveReferralCodeByID[repo]: Ошибка при коммите транзакции: %s", err)
+			errChan <- err
+			return
+		}
+
+		r.logger.Infof("DeleteActiveReferralCodeByID[repository]: Реферальный код с id %d успешно удален", id)
+		errChan <- nil
+	}()
+
+	select {
+	case err := <-errChan:
 		return err
+	case <-ctx.Done():
+		r.logger.Errorf("Create[repo]: Время ожидания превышено для пользователя")
+		return ctx.Err()
 	}
-
-	// If no rows affected, return ErrReferralCodeNotFound
-	rowsAffected := result.RowsAffected()
-	if rowsAffected == 0 {
-		r.logger.Warnf("DeleteActiveReferralCodeByID[repo]: Реферальный код с id: %d не найден для удаления", id)
-		return ErrReferralCodeNotFound
-	}
-
-	r.logger.Infof("DeleteActiveReferralCodeByID[repository]: Реферальный код с id %d успешно удален", id)
-	return nil
 }
 
 func (r *ReferralCodePostgres) GetActiveReferralCodeByUserID(referrerID int) (models.ReferralCode, error) {
@@ -87,29 +158,70 @@ func (r *ReferralCodePostgres) GetActiveReferralCodeByUserID(referrerID int) (mo
 	var referralCode models.ReferralCode
 	ctx := context.Background()
 
-	err := r.db.GetPool().QueryRow(ctx, query, referrerID).Scan(
-		&referralCode.ID,
-		&referralCode.Code,
-		&referralCode.Expiration,
-		&referralCode.ReferrerID,
-		&referralCode.CreatedAt,
-		&referralCode.UpdatedAt,
-	)
+	// Create context with timeout to cancel query execution if it takes too long
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel() // Cancel context after function ends
 
-	if err != nil {
-		// If no rows returned, return ErrReferralCodeNotFound.
-		if errors.Is(err, pgx.ErrNoRows) {
-			r.logger.Errorf("GetActiveReferralCodeByUserID[repo]: Активного реферального кода для рефера"+
-				" с id: %d не найдено", referrerID)
-			return models.ReferralCode{}, ErrReferralCodeNotFound
+	// Use a channel to get code from goroutine
+	codeChan := make(chan models.ReferralCode)
+
+	// Use a channel to get error from goroutine
+	errChan := make(chan error)
+
+	go func() {
+		// Begin transaction
+		tx, err := r.db.GetPool().BeginTx(ctx, pgx.TxOptions{})
+		if err != nil {
+			r.logger.Errorf("GetActiveReferralCodeByUserID[repo]: Ошибка начала транзакции: %s", err)
+			errChan <- err
+			return
 		}
-		r.logger.Errorf("GetActiveReferralCodeByUserID[repo]: Ошибка при получении реферального кода"+
-			" для рефера с id: %d: %s", referrerID, err)
-		return models.ReferralCode{}, err
-	}
+		defer tx.Rollback(ctx) // Rollback transaction if function returns error
 
-	r.logger.Infof("GetActiveReferralCodeByUserID[repo]: Найден активный реферальный код для реферера с id: %d", referrerID)
-	return referralCode, nil
+		err = tx.QueryRow(ctx, query, referrerID).Scan(
+			&referralCode.ID,
+			&referralCode.Code,
+			&referralCode.Expiration,
+			&referralCode.ReferrerID,
+			&referralCode.CreatedAt,
+			&referralCode.UpdatedAt,
+		)
+
+		if err != nil {
+			// If no rows returned, return ErrReferralCodeNotFound.
+			if errors.Is(err, pgx.ErrNoRows) {
+				r.logger.Errorf("GetActiveReferralCodeByUserID[repo]: Активного реферального кода для рефера"+
+					" с id: %d не найдено", referrerID)
+				errChan <- ErrReferralCodeNotFound
+				return
+			}
+
+			r.logger.Errorf("GetActiveReferralCodeByUserID[repo]: Ошибка при получении реферального кода"+
+				" для рефера с id: %d: %s", referrerID, err)
+			errChan <- err
+			return
+		}
+
+		// Commit transaction
+		if err = tx.Commit(ctx); err != nil {
+			r.logger.Errorf("GetActiveReferralCodeByUserID[repo]: Ошибка при коммите транзакции: %s", err)
+			errChan <- err
+			return
+		}
+
+		codeChan <- referralCode
+	}()
+
+	select {
+	case code := <-codeChan:
+		r.logger.Infof("GetActiveReferralCodeByUserID[repo]: Найден активный реферальный код для реферера с id: %d", referrerID)
+		return code, nil
+	case err := <-errChan:
+		return models.ReferralCode{}, err
+	case <-ctx.Done():
+		r.logger.Errorf("GetActiveReferralCodeByUserID[repo]: Время ожидания превышено для реферера с id: %d", referrerID)
+		return models.ReferralCode{}, ctx.Err()
+	}
 }
 
 func (r *ReferralCodePostgres) GetIDByReferralCode(code string) (int, error) {
@@ -120,24 +232,65 @@ func (r *ReferralCodePostgres) GetIDByReferralCode(code string) (int, error) {
 	var expiresAt time.Time
 	ctx := context.Background()
 
-	err := r.db.GetPool().QueryRow(ctx, query, code).Scan(&codeID, &expiresAt)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			r.logger.Warnf("GetIDByReferralCode[repo]: Реферальный код %s не найден", code)
-			return 0, ErrReferralCodeNotFound
+	// Create context with timeout to cancel query execution if it takes too long
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel() // Cancel context after function ends
+
+	// Use a channel to get id from goroutine
+	idChan := make(chan int)
+
+	// Use a channel to get error from goroutine
+	errChan := make(chan error)
+
+	go func() {
+		// Begin transaction
+		tx, err := r.db.GetPool().BeginTx(ctx, pgx.TxOptions{})
+		if err != nil {
+			r.logger.Errorf("GetIDByReferralCode[repo]: Ошибка начала транзакции: %s", err)
+			errChan <- err
+			return
 		}
-		r.logger.Errorf("GetIDByReferralCode[repo]: Ошибка при получении id реферального кода %s: %s", code, err)
+		defer tx.Rollback(ctx) // Rollback transaction if function returns error
+
+		err = tx.QueryRow(ctx, query, code).Scan(&codeID, &expiresAt)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				r.logger.Warnf("GetIDByReferralCode[repo]: Реферальный код %s не найден", code)
+				errChan <- ErrReferralCodeNotFound
+				return
+			}
+
+			r.logger.Errorf("GetIDByReferralCode[repo]: Ошибка при получении id реферального кода %s: %s", code, err)
+			errChan <- err
+		}
+
+		// Check if referral code is expired
+		if time.Now().After(expiresAt) {
+			r.logger.Infof("GetIDByReferralCode[repo]: Реферальный код %s неактивен (истек срок)", code)
+			errChan <- ErrReferralCodeNotActive
+			return
+		}
+
+		// Commit transaction
+		if err = tx.Commit(ctx); err != nil {
+			r.logger.Errorf("GetIDByReferralCode[repo]: Ошибка при коммите транзакции: %s", err)
+			errChan <- err
+			return
+		}
+
+		idChan <- codeID
+	}()
+
+	select {
+	case id := <-idChan:
+		r.logger.Infof("GetIDByReferralCode[repo]: ID Реферального кода: %s получен: %d", code, codeID)
+		return id, nil
+	case err := <-errChan:
 		return 0, err
+	case <-ctx.Done():
+		r.logger.Errorf("GetByEmail[repo]: Время ожидания превышено")
+		return 0, ctx.Err()
 	}
-
-	// Check if referral code is expired
-	if time.Now().After(expiresAt) {
-		r.logger.Infof("GetIDByReferralCode[repo]: Реферальный код %s неактивен (истек срок)", code)
-		return 0, nil
-	}
-
-	r.logger.Infof("GetIDByReferralCode[repo]: ID Реферального кода: %s получен: %d", code, codeID)
-	return codeID, nil
 }
 
 func (r *ReferralCodePostgres) GetReferrerIDByReferralCode(code string) (int, error) {
@@ -147,17 +300,58 @@ func (r *ReferralCodePostgres) GetReferrerIDByReferralCode(code string) (int, er
 	var referrerID int
 	ctx := context.Background()
 
-	err := r.db.GetPool().QueryRow(ctx, query, code).Scan(&referrerID)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			r.logger.Errorf("GetReferrerIDByReferralCode[repo]: Реферальный код %s не найден", code)
-			return 0, ErrReferralCodeNotFound
-		}
-		r.logger.Errorf("GetReferrerIDByReferralCode[repo]: Ошибка при получении id реферера"+
-			" по реферальному коду: %s: %s", code, err)
-		return 0, err
-	}
+	// Create context with timeout to cancel query execution if it takes too long
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel() // Cancel context after function ends
 
-	r.logger.Infof("GetIDByReferralCode[repo]: ID реферера получен: %d", referrerID)
-	return referrerID, nil
+	// Use a channel to get referrer id from goroutine
+	idChan := make(chan int)
+
+	// Use a channel to get error from goroutine
+	errChan := make(chan error)
+
+	go func() {
+		// Begin transaction
+		tx, err := r.db.GetPool().BeginTx(ctx, pgx.TxOptions{})
+		if err != nil {
+			r.logger.Errorf("GetReferrerIDByReferralCode[repo]: Ошибка начала транзакции: %s", err)
+			errChan <- err
+			return
+		}
+		defer tx.Rollback(ctx) // Rollback transaction if function returns error
+
+		err = tx.QueryRow(ctx, query, code).Scan(&referrerID)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				r.logger.Errorf("GetReferrerIDByReferralCode[repo]: Реферальный код %s не найден", code)
+				errChan <- ErrReferralCodeNotFound
+				return
+			}
+
+			r.logger.Errorf("GetReferrerIDByReferralCode[repo]: Ошибка при получении id реферера"+
+				" по реферальному коду: %s: %s", code, err)
+			errChan <- err
+			return
+		}
+
+		// Commit transaction
+		if err = tx.Commit(ctx); err != nil {
+			r.logger.Errorf("GetReferrerIDByReferralCode[repo]: Ошибка при коммите транзакции: %s", err)
+			errChan <- err
+			return
+		}
+
+		idChan <- referrerID
+	}()
+
+	select {
+	case id := <-idChan:
+		r.logger.Infof("GetIDByReferralCode[repo]: ID реферера получен: %d", referrerID)
+		return id, nil
+	case err := <-errChan:
+		return 0, err
+	case <-ctx.Done():
+		r.logger.Errorf("GetIDByReferralCode[repo]: Время ожидания превышено")
+		return 0, ctx.Err()
+	}
 }
