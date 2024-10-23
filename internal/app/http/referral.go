@@ -8,6 +8,18 @@ import (
 	"github.com/gorilla/mux"
 )
 
+// GetReferralsByReferrerIDHandler retrieves referrals based on referrer ID
+// @Summary Get referrals by referrer ID
+// @Description Retrieves a list of referrals based on the referrer's ID
+// @Tags referral
+// @Accept  json
+// @Produce  json
+// @Param referrer_id path int true "Referrer ID"
+// @Success 200 {array} models.ReferralInfoResponse "List of referrals"
+// @Failure 400 {string} string "Invalid ID format"
+// @Failure 404 {string} string "Referrals not found"
+// @Failure 500 {string} string "Internal server error"
+// @Router /referral/id/{referrer_id} [get]
 func (h *Handler) GetReferralsByReferrerIDHandler(w http.ResponseWriter, r *http.Request) {
 	h.logger.Debugf("GetReferralsByReferrerIDHandler[http]: Получение рефералов по id реферера")
 

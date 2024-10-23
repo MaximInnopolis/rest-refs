@@ -13,6 +13,7 @@ type UserRepo interface {
 	GetByEmail(email string) (models.User, error)
 }
 
+// ReferralCodeRepo defines interface for referral code-related database operations
 type ReferralCodeRepo interface {
 	Create(referralCode models.ReferralCode) (models.ReferralCode, error)
 	DeleteActiveReferralCodeByID(id int) error
@@ -27,7 +28,7 @@ type ReferralRepo interface {
 	Create(referral models.Referral) error
 }
 
-// Repository combines UserRepo and ReferralRepo interfaces into single struct
+// Repository combines UserRepo, ReferralCodeRepo, and ReferralRepo interfaces into single struct
 type Repository struct {
 	UserRepo
 	ReferralRepo

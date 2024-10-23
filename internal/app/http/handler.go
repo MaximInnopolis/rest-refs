@@ -25,23 +25,31 @@ func New(service api.Service, logger *logrus.Logger) *Handler {
 
 // RegisterRoutes registers HTTP routes
 func (h *Handler) RegisterRoutes(r *mux.Router) {
+	// API routes
 	authRouter := r.PathPrefix("/auth").Subrouter()
 
+	// @Router /auth/register [post]
 	authRouter.HandleFunc("/register", h.RegisterUserHandler).Methods("POST")
+	// @Router /auth/login [post]
 	authRouter.HandleFunc("/login", h.LoginUserHandler).Methods("POST")
+	// @Router /auth/register/referral [post]
 	authRouter.HandleFunc("/register/referral", h.RegisterWithReferralHandler).Methods("POST")
 
 	referralCodeRouter := r.PathPrefix("/referral_code").Subrouter()
 
 	createReferralCodeRouter := http.HandlerFunc(h.CreateReferralCodeHandler)
+	// @Router /referral_code [post]
 	referralCodeRouter.Handle("", h.RequireValidTokenMiddleware(createReferralCodeRouter)).Methods("POST")
 
 	deleteReferralCodeRouter := http.HandlerFunc(h.DeleteReferralCodeHandler)
+	// @Router /referral_code [delete]
 	referralCodeRouter.Handle("", h.RequireValidTokenMiddleware(deleteReferralCodeRouter)).Methods("DELETE")
 
+	// @Router /referral_code/email/{email} [get]
 	referralCodeRouter.HandleFunc("/email/{email}", h.GetReferralCodeByEmailHandler).Methods("GET")
 
 	referralRouter := r.PathPrefix("/referral").Subrouter()
+	// @Router /referral/id/{referrer_id} [get]
 	referralRouter.HandleFunc("/id/{referrer_id}", h.GetReferralsByReferrerIDHandler).Methods("GET")
 
 	// Swagger documentation endpoint

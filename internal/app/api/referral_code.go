@@ -61,6 +61,7 @@ func (r *ReferralCodeService) CreateReferralCode(referralCode models.ReferralCod
 	return createdCode, nil
 }
 
+// DeleteReferralCode removes active referral code for specified referrer ID
 func (r *ReferralCodeService) DeleteReferralCode(referrerID int) error {
 	r.logger.Debugf("DeleteReferralCode[service]: Удаление реферального пользователя с id: %d", referrerID)
 
@@ -72,6 +73,7 @@ func (r *ReferralCodeService) DeleteReferralCode(referrerID int) error {
 		return err
 	}
 
+	// Delete the active referral code by its ID
 	err = r.repo.DeleteActiveReferralCodeByID(referralCode.ID)
 	if err != nil {
 		r.logger.Errorf("DeleteReferralCode[service]: Ошибка при удалении реферального кода для пользователя"+
@@ -83,9 +85,11 @@ func (r *ReferralCodeService) DeleteReferralCode(referrerID int) error {
 	return nil
 }
 
+// GetReferralCodeByReferrerEmail retrieves the active referral code associated with a specific user's email
 func (r *ReferralCodeService) GetReferralCodeByReferrerEmail(email string) (models.ReferralCode, error) {
 	r.logger.Debugf("GetReferralCodeByReferrerEmail[service]: Получение реферального кода для email: %s", email)
 
+	// Fetch user by email
 	user, err := r.authService.GetUserByEmail(email)
 	if err != nil {
 		r.logger.Errorf("GetReferralCodeByReferrerEmail[service]: Ошибка при получении id пользователя"+
@@ -93,6 +97,7 @@ func (r *ReferralCodeService) GetReferralCodeByReferrerEmail(email string) (mode
 		return models.ReferralCode{}, err
 	}
 
+	// Retrieve active referral code for the user
 	code, err := r.repo.GetActiveReferralCodeByUserID(user.ID)
 	if err != nil {
 		r.logger.Errorf("GetReferralCodeByReferrerEmail[service]: Ошибка при получении активного реферального кода"+
@@ -104,11 +109,13 @@ func (r *ReferralCodeService) GetReferralCodeByReferrerEmail(email string) (mode
 	return code, nil
 }
 
+// GetIDByReferralCode retrieves ID of a referral code from repository
 func (r *ReferralCodeService) GetIDByReferralCode(code string) (int, error) {
 	r.logger.Debugf("GetIDByReferralCode[service]: Получение id реферального кода: %s", code)
 	return r.repo.GetIDByReferralCode(code)
 }
 
+// GetReferrerIDByReferralCode retrieves referrer ID associated with specific referral code
 func (r *ReferralCodeService) GetReferrerIDByReferralCode(code string) (int, error) {
 	r.logger.Debugf("GetReferrerIDByReferralCode[service]: Получение id реферера по реферальному коду: %s", code)
 	return r.repo.GetReferrerIDByReferralCode(code)

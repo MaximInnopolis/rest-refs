@@ -36,6 +36,7 @@ func (as *AuthService) GetUserByEmail(email string) (models.User, error) {
 func (as *AuthService) RegisterUser(user models.User) error {
 	as.logger.Debugf("RegisterUser[service]: Регистрация пользователя с email: %s", user.Email)
 
+	// Check if the user with the provided email already exists
 	_, err := as.GetUserByEmail(user.Email)
 	if err == nil {
 		as.logger.Errorf("RegisterUser[service]: Регистрация пользователя не удалось: " +
@@ -66,6 +67,7 @@ func (as *AuthService) RegisterUser(user models.User) error {
 func (as *AuthService) GenerateToken(user models.User) (string, error) {
 	as.logger.Debugf("GenerateToken[service]: Создание токена для пользователя: %s", user.Email)
 
+	// Retrieve user from repository
 	dbUser, err := as.repo.GetByEmail(user.Email)
 	if err != nil {
 		as.logger.Errorf("GenerateToken[service]: Ошибка при получении пользователя: %s для генерации токена: %s", user.Email, err)

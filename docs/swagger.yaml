@@ -1,0 +1,317 @@
+basePath: /
+definitions:
+  models.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  models.Referral:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: integer
+      referral_code_id:
+        type: integer
+      referrer_id:
+        type: integer
+      updated_at:
+        type: string
+    type: object
+  models.ReferralCodeCreateRequest:
+    properties:
+      expiration_date:
+        type: string
+    required:
+    - expiration_date
+    type: object
+  models.ReferralCodeResponse:
+    properties:
+      code:
+        type: string
+      expiration:
+        type: string
+    type: object
+  models.ReferralInfoResponse:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      referral_id:
+        type: integer
+      referrer_id:
+        type: integer
+    type: object
+  models.RegisterRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+      referral_code:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  models.User:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: integer
+      password:
+        type: string
+      referrals:
+        items:
+          $ref: '#/definitions/models.Referral'
+        type: array
+      updated_at:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: REST API service for a referral system
+  title: Refs API
+  version: "1.0"
+paths:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticates a user with email and password
+      parameters:
+      - description: User credentials
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/models.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully authenticated
+          schema:
+            type: string
+        "400":
+          description: Invalid data format
+          schema:
+            type: string
+        "500":
+          description: Server error
+          schema:
+            type: string
+      summary: Login a user
+      tags:
+      - Authentication
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Registers a new user with email and password
+      parameters:
+      - description: User data
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/models.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: User successfully registered
+          schema:
+            $ref: '#/definitions/models.User'
+        "400":
+          description: Invalid data format
+          schema:
+            type: string
+        "409":
+          description: User already exists
+          schema:
+            type: string
+        "500":
+          description: Server error
+          schema:
+            type: string
+      summary: Register a new user
+      tags:
+      - Authentication
+  /auth/register/referral:
+    post:
+      consumes:
+      - application/json
+      description: Registers a new user with a referral code
+      parameters:
+      - description: User data with referral code
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/models.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: User successfully registered
+          schema:
+            $ref: '#/definitions/models.User'
+        "400":
+          description: Invalid referral code or data
+          schema:
+            type: string
+        "404":
+          description: Referral code not found
+          schema:
+            type: string
+        "409":
+          description: User already exists
+          schema:
+            type: string
+        "500":
+          description: Server error
+          schema:
+            type: string
+      summary: Register a user with a referral code
+      tags:
+      - Referral
+  /referral/id/{referrer_id}:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a list of referrals based on the referrer's ID
+      parameters:
+      - description: Referrer ID
+        in: path
+        name: referrer_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of referrals
+          schema:
+            items:
+              $ref: '#/definitions/models.ReferralInfoResponse'
+            type: array
+        "400":
+          description: Invalid ID format
+          schema:
+            type: string
+        "404":
+          description: Referrals not found
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      summary: Get referrals by referrer ID
+      tags:
+      - referral
+  /referral_code:
+    delete:
+      description: Deletes the referral code of the authenticated user
+      responses:
+        "204":
+          description: Referral code deleted
+        "401":
+          description: Authentication error
+          schema:
+            type: string
+        "404":
+          description: Referral code not found
+          schema:
+            type: string
+        "500":
+          description: Server error
+          schema:
+            type: string
+      summary: Delete an active referral code
+      tags:
+      - referral_code
+    post:
+      consumes:
+      - application/json
+      description: Creates a referral code for the authenticated user
+      parameters:
+      - description: Referral code request
+        in: body
+        name: ReferralCodeCreateRequest
+        required: true
+        schema:
+          $ref: '#/definitions/models.ReferralCodeCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Referral code created
+          schema:
+            $ref: '#/definitions/models.ReferralCodeResponse'
+        "400":
+          description: Invalid data format or date
+          schema:
+            type: string
+        "401":
+          description: Authentication error
+          schema:
+            type: string
+        "409":
+          description: Referral code already exists
+          schema:
+            type: string
+        "500":
+          description: Server error
+          schema:
+            type: string
+      summary: Create a new referral code
+      tags:
+      - referral_code
+  /referral_code/email/{email}:
+    get:
+      description: Retrieves the referral code by the email of the referrer
+      parameters:
+      - description: Referrer email
+        in: path
+        name: email
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Referral code found
+          schema:
+            $ref: '#/definitions/models.ReferralCodeResponse'
+        "400":
+          description: Email cannot be empty
+          schema:
+            type: string
+        "404":
+          description: Referral code not found
+          schema:
+            type: string
+        "500":
+          description: Server error
+          schema:
+            type: string
+      summary: Get referral code by referrer email
+      tags:
+      - referral_code
+schemes:
+- http
+swagger: "2.0"

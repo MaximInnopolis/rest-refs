@@ -26,6 +26,8 @@ func NewReferralService(repo repository.ReferralRepo, referralCodeService *Refer
 	}
 }
 
+// GetReferralsByReferrerID retrieves all referrals associated with referrer ID
+// It fetches the referral data from repository and formats it into response structure
 func (r *ReferralService) GetReferralsByReferrerID(referrerID int) ([]models.ReferralInfoResponse, error) {
 	r.logger.Debugf("GetReferralsByReferrerID[service]: Получение рефералов для пользователя с id: %d", referrerID)
 
@@ -49,6 +51,8 @@ func (r *ReferralService) GetReferralsByReferrerID(referrerID int) ([]models.Ref
 	return response, nil
 }
 
+// RegisterWithReferralCode registers new user using referral code
+// It validates referral code, registers user, and creates referral in the repository
 func (r *ReferralService) RegisterWithReferralCode(referralCode string, user models.User) error {
 	r.logger.Debugf("RegisterWithReferralCode[service]: Регистрация реферала:"+
 		" %s с реферальным кодом: %s", user.Email, referralCode)
@@ -65,6 +69,7 @@ func (r *ReferralService) RegisterWithReferralCode(referralCode string, user mod
 		return err
 	}
 
+	// Get referrer ID associated with the referral code
 	referrerID, err := r.referralCodeService.GetReferrerIDByReferralCode(referralCode)
 	if err != nil {
 		return err
@@ -87,7 +92,8 @@ func (r *ReferralService) RegisterWithReferralCode(referralCode string, user mod
 	return nil
 }
 
-// generateReferralCode generates unique secure referral code
+// generateReferralCode generates unique referral code by creating random byte array and encoding it
+// The referral code is base64-encoded and converted to uppercase for consistency
 func generateReferralCode() (string, error) {
 	randomBytes := make([]byte, referralCodeLength)
 

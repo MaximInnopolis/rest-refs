@@ -10,6 +10,18 @@ import (
 	"rest-refs/internal/app/repository/postgresql"
 )
 
+// RegisterUserHandler handles user registration
+// @Summary Register a new user
+// @Description Registers a new user with email and password
+// @Tags Authentication
+// @Accept json
+// @Produce json
+// @Param input body models.RegisterRequest true "User data"
+// @Success 201 {object} models.User "User successfully registered"
+// @Failure 400 {string} string "Invalid data format"
+// @Failure 409 {string} string "User already exists"
+// @Failure 500 {string} string "Server error"
+// @Router /auth/register [post]
 func (h *Handler) RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
 	h.logger.Debugf("RegisterUserHandler[http]: Регистрация пользователя")
 
@@ -45,8 +57,16 @@ func (h *Handler) RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // LoginUserHandler handles user login requests
-// It parses request body to get email and password, generates token
-// and responds with token if successful
+// @Summary Login a user
+// @Description Authenticates a user with email and password
+// @Tags Authentication
+// @Accept json
+// @Produce json
+// @Param input body models.LoginRequest true "User credentials"
+// @Success 200 {object} string "Successfully authenticated"
+// @Failure 400 {string} string "Invalid data format"
+// @Failure 500 {string} string "Server error"
+// @Router /auth/login [post]
 func (h *Handler) LoginUserHandler(w http.ResponseWriter, r *http.Request) {
 	h.logger.Debugf("LoginUserHandler[http]: Логин пользователя")
 
@@ -77,6 +97,19 @@ func (h *Handler) LoginUserHandler(w http.ResponseWriter, r *http.Request) {
 	h.logger.Debugf("LoginUserHandler[http]: Логин пользователя прошел успешно")
 }
 
+// RegisterWithReferralHandler registers a user with a referral code
+// @Summary Register a user with a referral code
+// @Description Registers a new user with a referral code
+// @Tags Referral
+// @Accept json
+// @Produce json
+// @Param input body models.RegisterRequest true "User data with referral code"
+// @Success 201 {object} models.User "User successfully registered"
+// @Failure 400 {string} string "Invalid referral code or data"
+// @Failure 404 {string} string "Referral code not found"
+// @Failure 409 {string} string "User already exists"
+// @Failure 500 {string} string "Server error"
+// @Router /auth/register/referral [post]
 func (h *Handler) RegisterWithReferralHandler(w http.ResponseWriter, r *http.Request) {
 	h.logger.Debugf("RegisterWithReferralHandler[http]: Регистрация реферала")
 
@@ -123,5 +156,6 @@ func (h *Handler) RegisterWithReferralHandler(w http.ResponseWriter, r *http.Req
 	// Respond with created user
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
+
 	h.logger.Infof("RegisterUserHandler[http]: Регистрация реферала прошла успешно")
 }

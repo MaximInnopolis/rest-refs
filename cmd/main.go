@@ -5,12 +5,20 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
+	_ "rest-refs/docs"
 	"rest-refs/internal/app/api"
 	"rest-refs/internal/app/config"
 	httpHandler "rest-refs/internal/app/http"
 	"rest-refs/internal/app/repository"
 	"rest-refs/internal/app/repository/database"
 )
+
+// @title Refs API
+// @version 1.0
+// @description REST API service for a referral system
+// @host localhost:8080
+// @basePath /
+// @schemes http
 
 func main() {
 	// Initialize logger

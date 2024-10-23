@@ -7,6 +7,7 @@ import (
 	"rest-refs/internal/app/repository"
 )
 
+// Authorization defines methods related to user authorization and token management
 type Authorization interface {
 	RegisterUser(user models.User) error
 	GetUserByEmail(email string) (models.User, error)
@@ -14,6 +15,7 @@ type Authorization interface {
 	IsTokenValid(tokenString string) (bool, jwt.MapClaims, error)
 }
 
+// ReferralCode defines methods for handling referral codes
 type ReferralCode interface {
 	CreateReferralCode(referralCode models.ReferralCode) (models.ReferralCode, error)
 	DeleteReferralCode(referrerID int) error
@@ -22,11 +24,13 @@ type ReferralCode interface {
 	GetReferrerIDByReferralCode(code string) (int, error)
 }
 
+// Referral defines methods related to referral management
 type Referral interface {
 	GetReferralsByReferrerID(referrerID int) ([]models.ReferralInfoResponse, error)
 	RegisterWithReferralCode(referralCode string, user models.User) error
 }
 
+// Service aggregates different services related to user authorization, referral codes, and referrals
 type Service struct {
 	Authorization
 	Referral
